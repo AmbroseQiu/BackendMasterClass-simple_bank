@@ -1,0 +1,16 @@
+version: '3'
+services:
+  db:
+    image: postgres:12-alpine
+    container_name: postgres12
+    restart: always
+    environment:
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=secret
+    ports:
+      - '5432:5432'
+    # volumes: 
+      # - db:/var/lib/postgresql/data
+volumes:
+  db:
+    driver: local
