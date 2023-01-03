@@ -13,11 +13,12 @@ import (
 	mockdb "github.com/backendmaster/simple_bank/db/mock"
 	db "github.com/backendmaster/simple_bank/db/sqlc"
 	"github.com/backendmaster/simple_bank/util"
+	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetAccout(t *testing.T) {
+func TestGetAccount(t *testing.T) {
 	account := randomAccount()
 
 	testCases := []struct {
@@ -102,6 +103,44 @@ func TestGetAccout(t *testing.T) {
 			tc.checkResponse(t, recorder)
 		})
 	}
+}
+
+func TestCreateAccount(t *testing.T) {
+	account := randomAccount()
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	store := mockdb.NewMockStore(ctrl)
+
+	arg := db.CreateAccountParams{
+		Owner:    account.Owner,
+		Balance:  0,
+		Currency: account.Currency,
+	}
+	//build stub
+	store.EXPECT().
+		CreateAccount(gomock.Any(), gomock.Eq(arg)).
+		Times(1).
+		Return(account, nil)
+	//start new server and send request
+	server := NewServer(store)
+	recorder := httptest.NewRecorder()
+
+	body := gin.H{
+		"owner":    account.Owner,
+		"currency": account.Currency,
+	}
+	//marshal body to json
+	data, err := json.Marshal(body)
+	require.NoError(t, err)
+	url := fmt.Sprintf("/accounts")
+	request, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(data))
+	require.NoError(t, err)
+	server.router.ServeHTTP(recorder, request)
+	//check response
+	require.Equal(t, http.StatusOK, recorder.Code)
+	requiredBodyMatched(t, recorder.Body, account)
 }
 
 func randomAccount() db.Account {
