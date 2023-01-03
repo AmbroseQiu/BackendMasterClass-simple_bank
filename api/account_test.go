@@ -108,39 +108,61 @@ func TestGetAccount(t *testing.T) {
 func TestCreateAccount(t *testing.T) {
 	account := randomAccount()
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	store := mockdb.NewMockStore(ctrl)
-
-	arg := db.CreateAccountParams{
-		Owner:    account.Owner,
-		Balance:  0,
-		Currency: account.Currency,
+	testCases := []struct {
+		name          string
+		body          gin.H
+		buildStub     func(store *mockdb.MockStore)
+		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
+	}{
+		{
+			name: "ok",
+			body: gin.H{
+				"owner":    account.Owner,
+				"currency": account.Currency,
+			},
+			buildStub: func(store *mockdb.MockStore) {
+				arg := db.CreateAccountParams{
+					Owner:    account.Owner,
+					Balance:  0,
+					Currency: account.Currency,
+				}
+				store.EXPECT().
+					CreateAccount(gomock.Any(), gomock.Eq(arg)).
+					Times(1).
+					Return(account, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusOK, recorder.Code)
+				requiredBodyMatched(t, recorder.Body, account)
+			},
+		},
 	}
-	//build stub
-	store.EXPECT().
-		CreateAccount(gomock.Any(), gomock.Eq(arg)).
-		Times(1).
-		Return(account, nil)
-	//start new server and send request
-	server := NewServer(store)
-	recorder := httptest.NewRecorder()
 
-	body := gin.H{
-		"owner":    account.Owner,
-		"currency": account.Currency,
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			store := mockdb.NewMockStore(ctrl)
+
+			//build stub
+			tc.buildStub(store)
+			//start new server and send request
+			server := NewServer(store)
+			recorder := httptest.NewRecorder()
+			//marshal body to json
+			data, err := json.Marshal(tc.body)
+			require.NoError(t, err)
+			url := "/accounts"
+			request, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(data))
+			require.NoError(t, err)
+			server.router.ServeHTTP(recorder, request)
+			//check response
+			tc.checkResponse(t, recorder)
+		})
 	}
-	//marshal body to json
-	data, err := json.Marshal(body)
-	require.NoError(t, err)
-	url := fmt.Sprintf("/accounts")
-	request, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(data))
-	require.NoError(t, err)
-	server.router.ServeHTTP(recorder, request)
-	//check response
-	require.Equal(t, http.StatusOK, recorder.Code)
-	requiredBodyMatched(t, recorder.Body, account)
+
 }
 
 func randomAccount() db.Account {
