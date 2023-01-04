@@ -169,6 +169,26 @@ func TestTransferAPI(t *testing.T) {
 				require.Equal(t, http.StatusInternalServerError, recorder.Code)
 			},
 		},
+		{
+			name: "Get Account failed",
+			body: gin.H{
+				"from_account_id": sameCurrencyAccount1.ID,
+				"to_account_id":   sameCurrencyAccount2.ID,
+				"amount":          amount,
+				"currency":        util.USD,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					GetAccount(gomock.Any(), gomock.Eq(sameCurrencyAccount1.ID)).
+					Times(1).
+					Return(db.Account{}, sql.ErrConnDone)
+				store.EXPECT().
+					TransferTx(gomock.Any(), gomock.Any()).Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusInternalServerError, recorder.Code)
+			},
+		},
 	}
 
 	for i := range testCase {
