@@ -18,10 +18,12 @@ import (
 
 func TestTransferAPI(t *testing.T) {
 	amount := int64(10)
-	account1 := randomAccount()
-	account2 := randomAccount()
-	account1.Currency = util.USD
-	account2.Currency = util.USD
+	sameCurrencyAccount1 := randomAccount()
+	sameCurrencyAccount2 := randomAccount()
+	differentCurrencyAccount := randomAccount()
+	sameCurrencyAccount1.Currency = util.USD
+	sameCurrencyAccount2.Currency = util.USD
+	differentCurrencyAccount.Currency = util.EUR
 
 	testCase := []struct {
 		name          string
@@ -32,25 +34,25 @@ func TestTransferAPI(t *testing.T) {
 		{
 			name: "ok",
 			body: gin.H{
-				"from_account_id": account1.ID,
-				"to_account_id":   account2.ID,
+				"from_account_id": sameCurrencyAccount1.ID,
+				"to_account_id":   sameCurrencyAccount2.ID,
 				"amount":          amount,
 				"currency":        util.USD,
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				arg := db.TransferTxParams{
-					FromAccountID: account1.ID,
-					ToAccountID:   account2.ID,
+					FromAccountID: sameCurrencyAccount1.ID,
+					ToAccountID:   sameCurrencyAccount2.ID,
 					Amount:        amount,
 				}
 				store.EXPECT().
-					GetAccount(gomock.Any(), gomock.Eq(account1.ID)).
+					GetAccount(gomock.Any(), gomock.Eq(sameCurrencyAccount1.ID)).
 					Times(1).
-					Return(account1, nil)
+					Return(sameCurrencyAccount1, nil)
 				store.EXPECT().
-					GetAccount(gomock.Any(), gomock.Eq(account2.ID)).
+					GetAccount(gomock.Any(), gomock.Eq(sameCurrencyAccount2.ID)).
 					Times(1).
-					Return(account2, nil)
+					Return(sameCurrencyAccount2, nil)
 				store.EXPECT().
 					TransferTx(gomock.Any(), gomock.Eq(arg)).Times(1)
 			},
@@ -75,23 +77,18 @@ func TestTransferAPI(t *testing.T) {
 		{
 			name: "Currency Mismatched of Account1",
 			body: gin.H{
-				"from_account_id": account1.ID,
-				"to_account_id":   account2.ID,
+				"from_account_id": differentCurrencyAccount.ID,
+				"to_account_id":   sameCurrencyAccount2.ID,
 				"amount":          amount,
-				"currency":        util.EUR,
+				"currency":        util.USD,
 			},
 			buildStubs: func(store *mockdb.MockStore) {
-				arg := db.TransferTxParams{
-					FromAccountID: account1.ID,
-					ToAccountID:   account2.ID,
-					Amount:        amount,
-				}
 				store.EXPECT().
-					GetAccount(gomock.Any(), gomock.Eq(account1.ID)).
+					GetAccount(gomock.Any(), gomock.Eq(differentCurrencyAccount.ID)).
 					Times(1).
-					Return(account1, nil)
+					Return(differentCurrencyAccount, nil)
 				store.EXPECT().
-					TransferTx(gomock.Any(), gomock.Eq(arg)).Times(0)
+					TransferTx(gomock.Any(), gomock.Any()).Times(0)
 			},
 			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
 				require.Equal(t, http.StatusBadRequest, recorder.Code)
@@ -100,28 +97,22 @@ func TestTransferAPI(t *testing.T) {
 		{
 			name: "Currency Mismatched of Account2",
 			body: gin.H{
-				"from_account_id": account1.ID,
-				"to_account_id":   account2.ID,
+				"from_account_id": sameCurrencyAccount1.ID,
+				"to_account_id":   differentCurrencyAccount.ID,
 				"amount":          amount,
-				"currency":        util.EUR,
+				"currency":        util.USD,
 			},
 			buildStubs: func(store *mockdb.MockStore) {
-				account1.Currency = util.EUR
-				arg := db.TransferTxParams{
-					FromAccountID: account1.ID,
-					ToAccountID:   account2.ID,
-					Amount:        amount,
-				}
 				store.EXPECT().
-					GetAccount(gomock.Any(), gomock.Eq(account1.ID)).
+					GetAccount(gomock.Any(), gomock.Eq(sameCurrencyAccount1.ID)).
 					Times(1).
-					Return(account1, nil)
+					Return(sameCurrencyAccount1, nil)
 				store.EXPECT().
-					GetAccount(gomock.Any(), gomock.Eq(account2.ID)).
+					GetAccount(gomock.Any(), gomock.Eq(differentCurrencyAccount.ID)).
 					Times(1).
-					Return(account2, nil)
+					Return(differentCurrencyAccount, nil)
 				store.EXPECT().
-					TransferTx(gomock.Any(), gomock.Eq(arg)).Times(0)
+					TransferTx(gomock.Any(), gomock.Any()).Times(0)
 			},
 			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
 				require.Equal(t, http.StatusBadRequest, recorder.Code)
@@ -130,50 +121,45 @@ func TestTransferAPI(t *testing.T) {
 		{
 			name: "Account1 Not Found",
 			body: gin.H{
-				"from_account_id": account1.ID,
-				"to_account_id":   account2.ID,
+				"from_account_id": sameCurrencyAccount1.ID,
+				"to_account_id":   sameCurrencyAccount2.ID,
 				"amount":          amount,
-				"currency":        util.EUR,
+				"currency":        util.USD,
 			},
 			buildStubs: func(store *mockdb.MockStore) {
-				arg := db.TransferTxParams{
-					FromAccountID: account1.ID,
-					ToAccountID:   account2.ID,
-					Amount:        amount,
-				}
 				store.EXPECT().
-					GetAccount(gomock.Any(), gomock.Eq(account1.ID)).
+					GetAccount(gomock.Any(), gomock.Eq(sameCurrencyAccount1.ID)).
 					Times(1).
 					Return(db.Account{}, sql.ErrNoRows)
 				store.EXPECT().
-					TransferTx(gomock.Any(), gomock.Eq(arg)).Times(0)
+					TransferTx(gomock.Any(), gomock.Any()).Times(0)
 			},
 			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
 				require.Equal(t, http.StatusNotFound, recorder.Code)
 			},
 		},
 		{
-			name: "TransferAPI Failed",
+			name: "Transcation Failed",
 			body: gin.H{
-				"from_account_id": account1.ID,
-				"to_account_id":   account2.ID,
+				"from_account_id": sameCurrencyAccount1.ID,
+				"to_account_id":   sameCurrencyAccount2.ID,
 				"amount":          amount,
 				"currency":        util.USD,
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				arg := db.TransferTxParams{
-					FromAccountID: account1.ID,
-					ToAccountID:   account2.ID,
+					FromAccountID: sameCurrencyAccount1.ID,
+					ToAccountID:   sameCurrencyAccount2.ID,
 					Amount:        amount,
 				}
 				store.EXPECT().
-					GetAccount(gomock.Any(), gomock.Eq(account1.ID)).
+					GetAccount(gomock.Any(), gomock.Eq(sameCurrencyAccount1.ID)).
 					Times(1).
-					Return(account1, nil)
+					Return(sameCurrencyAccount1, nil)
 				store.EXPECT().
-					GetAccount(gomock.Any(), gomock.Eq(account2.ID)).
+					GetAccount(gomock.Any(), gomock.Eq(sameCurrencyAccount2.ID)).
 					Times(1).
-					Return(account2, nil)
+					Return(sameCurrencyAccount2, nil)
 				store.EXPECT().
 					TransferTx(gomock.Any(), gomock.Eq(arg)).
 					Times(1).
