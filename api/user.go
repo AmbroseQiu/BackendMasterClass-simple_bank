@@ -16,6 +16,12 @@ type createUserRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 }
 
+type createUserResponse struct {
+	Username string `json:"username"`
+	FullName string `json:"full_name"`
+	Email    string `json:"email"`
+}
+
 func (server *Server) createUser(ctx *gin.Context) {
 	var req createUserRequest
 
@@ -47,6 +53,10 @@ func (server *Server) createUser(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, errResponse(err))
 		return
 	}
-
-	ctx.JSON(http.StatusOK, user)
+	rsp := createUserResponse{
+		Username: user.Username,
+		FullName: user.FullName,
+		Email:    user.Email,
+	}
+	ctx.JSON(http.StatusOK, rsp)
 }
