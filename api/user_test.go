@@ -49,41 +49,122 @@ func EqCreateUserParamsMatcher(arg db.CreateUserParams, password string) gomock.
 func TestCreateUserAPI(t *testing.T) {
 	user, password := randomUser()
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	store := mockdb.NewMockStore(ctrl)
-
-	arg := db.CreateUserParams{
-		Username: user.Username,
-		FullName: user.FullName,
-		Email:    user.Email,
+	testCase := []struct {
+		name          string
+		body          gin.H
+		buildStubs    func(store *mockdb.MockStore)
+		checkResponse func(*httptest.ResponseRecorder)
+	}{
+		{
+			name: "ok",
+			body: gin.H{
+				"username": user.Username,
+				"password": password,
+				"fullname": user.FullName,
+				"email":    user.Email,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				arg := db.CreateUserParams{
+					Username: user.Username,
+					FullName: user.FullName,
+					Email:    user.Email,
+				}
+				//build stub
+				store.EXPECT().
+					CreateUser(gomock.Any(), EqCreateUserParamsMatcher(arg, password)).
+					Times(1).
+					Return(user, nil)
+			},
+			checkResponse: func(recorder *httptest.ResponseRecorder) {
+				rsp := createUserResponse{
+					Username: user.Username,
+					FullName: user.FullName,
+					Email:    user.Email,
+				}
+				require.Equal(t, http.StatusOK, recorder.Code)
+				requiredBodyMatchedUser(t, recorder.Body, rsp)
+			},
+		},
+		{
+			name: "Invalid Email",
+			body: gin.H{
+				"username": user.Username,
+				"password": password,
+				"fullname": user.FullName,
+				"email":    "abcemail.com",
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				//build stub
+				store.EXPECT().
+					CreateUser(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, recorder.Code)
+			},
+		},
+		{
+			name: "Invalid Password",
+			body: gin.H{
+				"username": user.Username,
+				"password": "12345",
+				"fullname": user.FullName,
+				"email":    user.Email,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				//build stub
+				store.EXPECT().
+					CreateUser(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, recorder.Code)
+			},
+		},
+		{
+			name: "Invalid Username",
+			body: gin.H{
+				"username": "abdc#",
+				"password": password,
+				"fullname": user.FullName,
+				"email":    user.Email,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				//build stub
+				store.EXPECT().
+					CreateUser(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, recorder.Code)
+			},
+		},
 	}
-	//build stub
-	store.EXPECT().
-		CreateUser(gomock.Any(), EqCreateUserParamsMatcher(arg, password)).
-		Times(1).
-		Return(user, nil)
-	//start new server and send request
-	server := NewServer(store)
-	recorder := httptest.NewRecorder()
 
-	body := gin.H{
-		"username": user.Username,
-		"password": password,
-		"fullname": user.FullName,
-		"email":    user.Email,
+	for i := range testCase {
+		tc := testCase[i]
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			store := mockdb.NewMockStore(ctrl)
+			//buildstubs
+			tc.buildStubs(store)
+			//start new server and send request
+			server := NewServer(store)
+			recorder := httptest.NewRecorder()
+
+			//marshal body to json
+			data, err := json.Marshal(tc.body)
+			require.NoError(t, err)
+			url := "/users"
+			request, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(data))
+			require.NoError(t, err)
+			server.router.ServeHTTP(recorder, request)
+			//check response
+			tc.checkResponse(recorder)
+		})
 	}
-	//marshal body to json
-	data, err := json.Marshal(body)
-	require.NoError(t, err)
-	url := "/users"
-	request, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(data))
-	require.NoError(t, err)
-	server.router.ServeHTTP(recorder, request)
-	//check response
-	// tc.checkResponse(t, recorder)
-	require.Equal(t, http.StatusOK, recorder.Code)
 }
 
 func randomUser() (user db.User, password string) {
@@ -94,7 +175,7 @@ func randomUser() (user db.User, password string) {
 	}, util.RandomString(6)
 }
 
-func requiredBodyMatchedUser(t *testing.T, body *bytes.Buffer, rsp createUserRequest) {
+func requiredBodyMatchedUser(t *testing.T, body *bytes.Buffer, rsp createUserResponse) {
 	data, err := ioutil.ReadAll(body)
 	require.NoError(t, err)
 
