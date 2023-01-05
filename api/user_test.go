@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -15,6 +16,7 @@ import (
 	"github.com/backendmaster/simple_bank/util"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
+	"github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 )
 
@@ -47,7 +49,7 @@ func EqCreateUserParamsMatcher(arg db.CreateUserParams, password string) gomock.
 }
 
 func TestCreateUserAPI(t *testing.T) {
-	user, password := randomUser()
+	user, password := randomUser(t)
 
 	testCase := []struct {
 		name          string
@@ -139,6 +141,53 @@ func TestCreateUserAPI(t *testing.T) {
 				require.Equal(t, http.StatusBadRequest, recorder.Code)
 			},
 		},
+		{
+			name: "StatusInternalServerError",
+			body: gin.H{
+				"username": user.Username,
+				"password": password,
+				"fullname": user.FullName,
+				"email":    user.Email,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				arg := db.CreateUserParams{
+					Username: user.Username,
+					FullName: user.FullName,
+					Email:    user.Email,
+				}
+				//build stub
+				store.EXPECT().
+					CreateUser(gomock.Any(), EqCreateUserParamsMatcher(arg, password)).
+					Times(1).
+					Return(db.User{}, sql.ErrNoRows)
+			},
+			checkResponse: func(recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusInternalServerError, recorder.Code)
+			},
+		},
+		{
+			name: "DuplicateUsername",
+			body: gin.H{
+				"username":  user.Username,
+				"password":  password,
+				"full_name": user.FullName,
+				"email":     user.Email,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				arg := db.CreateUserParams{
+					Username: user.Username,
+					FullName: user.FullName,
+					Email:    user.Email,
+				}
+				store.EXPECT().
+					CreateUser(gomock.Any(), EqCreateUserParamsMatcher(arg, password)).
+					Times(1).
+					Return(db.User{}, &pq.Error{Code: "23505"})
+			},
+			checkResponse: func(recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusForbidden, recorder.Code)
+			},
+		},
 	}
 
 	for i := range testCase {
@@ -167,12 +216,18 @@ func TestCreateUserAPI(t *testing.T) {
 	}
 }
 
-func randomUser() (user db.User, password string) {
+func randomUser(t *testing.T) (user db.User, password string) {
+	password = util.RandomString(6)
+
+	hashedPassword, err := util.HashedPassword(password)
+	require.NoError(t, err)
+
 	return db.User{
-		Username: util.RandomOwnerName(),
-		FullName: util.RandomOwnerName(),
-		Email:    util.RandomEmail(),
-	}, util.RandomString(6)
+		Username:       util.RandomOwnerName(),
+		HashedPassword: hashedPassword,
+		FullName:       util.RandomOwnerName(),
+		Email:          util.RandomEmail(),
+	}, password
 }
 
 func requiredBodyMatchedUser(t *testing.T, body *bytes.Buffer, rsp createUserResponse) {
