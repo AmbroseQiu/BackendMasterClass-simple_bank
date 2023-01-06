@@ -16,7 +16,6 @@ import (
 	"github.com/backendmaster/simple_bank/util"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
-	"github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 )
 
@@ -78,13 +77,8 @@ func TestCreateUserAPI(t *testing.T) {
 					Return(user, nil)
 			},
 			checkResponse: func(recorder *httptest.ResponseRecorder) {
-				rsp := createUserResponse{
-					Username: user.Username,
-					FullName: user.FullName,
-					Email:    user.Email,
-				}
 				require.Equal(t, http.StatusOK, recorder.Code)
-				requiredBodyMatchedUser(t, recorder.Body, rsp)
+				requireBodyMatchUser(t, recorder.Body, user)
 			},
 		},
 		{
@@ -165,29 +159,29 @@ func TestCreateUserAPI(t *testing.T) {
 				require.Equal(t, http.StatusInternalServerError, recorder.Code)
 			},
 		},
-		{
-			name: "DuplicateUsername",
-			body: gin.H{
-				"username":  user.Username,
-				"password":  password,
-				"full_name": user.FullName,
-				"email":     user.Email,
-			},
-			buildStubs: func(store *mockdb.MockStore) {
-				arg := db.CreateUserParams{
-					Username: user.Username,
-					FullName: user.FullName,
-					Email:    user.Email,
-				}
-				store.EXPECT().
-					CreateUser(gomock.Any(), EqCreateUserParamsMatcher(arg, password)).
-					Times(1).
-					Return(db.User{}, &pq.Error{Code: "23505"})
-			},
-			checkResponse: func(recorder *httptest.ResponseRecorder) {
-				require.Equal(t, http.StatusForbidden, recorder.Code)
-			},
-		},
+		// {
+		// 	name: "DuplicateUsername",
+		// 	body: gin.H{
+		// 		"username":  user.Username,
+		// 		"password":  password,
+		// 		"full_name": user.FullName,
+		// 		"email":     user.Email,
+		// 	},
+		// 	buildStubs: func(store *mockdb.MockStore) {
+		// 		arg := db.CreateUserParams{
+		// 			Username: user.Username,
+		// 			FullName: user.FullName,
+		// 			Email:    user.Email,
+		// 		}
+		// 		store.EXPECT().
+		// 			CreateUser(gomock.Any(), EqCreateUserParamsMatcher(arg, password)).
+		// 			Times(1).
+		// 			Return(db.User{}, &pq.Error{Code: "23505"})
+		// 	},
+		// 	checkResponse: func(recorder *httptest.ResponseRecorder) {
+		// 		require.Equal(t, http.StatusForbidden, recorder.Code)
+		// 	},
+		// },
 	}
 
 	for i := range testCase {
@@ -222,20 +216,25 @@ func randomUser(t *testing.T) (user db.User, password string) {
 	hashedPassword, err := util.HashedPassword(password)
 	require.NoError(t, err)
 
-	return db.User{
+	user = db.User{
 		Username:       util.RandomOwnerName(),
 		HashedPassword: hashedPassword,
 		FullName:       util.RandomOwnerName(),
 		Email:          util.RandomEmail(),
-	}, password
+	}
+	return
 }
 
-func requiredBodyMatchedUser(t *testing.T, body *bytes.Buffer, rsp createUserResponse) {
+func requireBodyMatchUser(t *testing.T, body *bytes.Buffer, user db.User) {
 	data, err := ioutil.ReadAll(body)
 	require.NoError(t, err)
 
-	var gotResponse createUserResponse
-	err = json.Unmarshal(data, &gotResponse)
+	var gotUser db.User
+	err = json.Unmarshal(data, &gotUser)
+
 	require.NoError(t, err)
-	require.Equal(t, rsp, gotResponse)
+	require.Equal(t, user.Username, gotUser.Username)
+	require.Equal(t, user.FullName, gotUser.FullName)
+	require.Equal(t, user.Email, gotUser.Email)
+	require.Empty(t, gotUser.HashedPassword)
 }

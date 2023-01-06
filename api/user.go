@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"time"
 
 	db "github.com/backendmaster/simple_bank/db/sqlc"
 	"github.com/backendmaster/simple_bank/util"
@@ -17,9 +18,11 @@ type createUserRequest struct {
 }
 
 type createUserResponse struct {
-	Username string `json:"username"`
-	FullName string `json:"full_name"`
-	Email    string `json:"email"`
+	Username          string    `json:"username"`
+	FullName          string    `json:"full_name"`
+	Email             string    `json:"email"`
+	PasswordChangedAt time.Time `json:"password_changed_at"`
+	CreatedAt         time.Time `json:"created_at"`
 }
 
 func (server *Server) createUser(ctx *gin.Context) {
@@ -32,7 +35,8 @@ func (server *Server) createUser(ctx *gin.Context) {
 
 	hashedPassword, err := util.HashedPassword(req.Password)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, errResponse(err))
+		ctx.JSON(http.StatusInternalServerError, errResponse(err))
+		return
 	}
 	arg := db.CreateUserParams{
 		Username:       req.Username,
@@ -54,9 +58,11 @@ func (server *Server) createUser(ctx *gin.Context) {
 		return
 	}
 	rsp := createUserResponse{
-		Username: user.Username,
-		FullName: user.FullName,
-		Email:    user.Email,
+		Username:          user.Username,
+		FullName:          user.FullName,
+		Email:             user.Email,
+		PasswordChangedAt: user.PasswordCreatedAt,
+		CreatedAt:         user.CreatedAt,
 	}
 	ctx.JSON(http.StatusOK, rsp)
 }
