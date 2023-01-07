@@ -9,9 +9,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	mockdb "github.com/backendmaster/simple_bank/db/mock"
 	db "github.com/backendmaster/simple_bank/db/sqlc"
+	"github.com/backendmaster/simple_bank/token"
 	"github.com/backendmaster/simple_bank/util"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
@@ -19,17 +21,22 @@ import (
 )
 
 func TestGetAccount(t *testing.T) {
-	account := randomAccount()
+	user, _ := randomUser(t)
+	account := randomAccount(user.Username)
 
 	testCases := []struct {
 		name          string
 		accountID     int64
+		addAuth       func(request *http.Request, tokenMaker token.Maker)
 		buildstub     func(store *mockdb.MockStore)
 		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
 	}{
 		{
 			name:      "ok",
 			accountID: account.ID,
+			addAuth: func(request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user.Username, time.Minute)
+			},
 			buildstub: func(store *mockdb.MockStore) {
 				store.EXPECT().
 					GetAccount(gomock.Any(), gomock.Eq(account.ID)).
@@ -42,8 +49,43 @@ func TestGetAccount(t *testing.T) {
 			},
 		},
 		{
+			name:      "unauthorization",
+			accountID: account.ID,
+			addAuth: func(request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, "unthorizate user", time.Minute)
+			},
+			buildstub: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					GetAccount(gomock.Any(), gomock.Eq(account.ID)).
+					Times(1).
+					Return(account, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusUnauthorized, recorder.Code)
+				// requiredBodyMatched(t, recorder.Body, account)
+			},
+		},
+		{
+			name:      "no authorization",
+			accountID: account.ID,
+			addAuth: func(request *http.Request, tokenMaker token.Maker) {
+			},
+			buildstub: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					GetAccount(gomock.Any(), gomock.Any()).
+					Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusUnauthorized, recorder.Code)
+				// requiredBodyMatched(t, recorder.Body, account)
+			},
+		},
+		{
 			name:      "Not Found",
 			accountID: account.ID,
+			addAuth: func(request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user.Username, time.Minute)
+			},
 			buildstub: func(store *mockdb.MockStore) {
 				store.EXPECT().
 					GetAccount(gomock.Any(), gomock.Eq(account.ID)).
@@ -57,6 +99,9 @@ func TestGetAccount(t *testing.T) {
 		{
 			name:      "Internal Error",
 			accountID: account.ID,
+			addAuth: func(request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user.Username, time.Minute)
+			},
 			buildstub: func(store *mockdb.MockStore) {
 				store.EXPECT().
 					GetAccount(gomock.Any(), gomock.Eq(account.ID)).
@@ -70,6 +115,9 @@ func TestGetAccount(t *testing.T) {
 		{
 			name:      "Invalid ID",
 			accountID: 0, // [1,100]
+			addAuth: func(request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, user.Username, time.Minute)
+			},
 			buildstub: func(store *mockdb.MockStore) {
 				store.EXPECT().
 					GetAccount(gomock.Any(), gomock.Any()).
@@ -98,6 +146,8 @@ func TestGetAccount(t *testing.T) {
 			url := fmt.Sprintf("/accounts/%d", tc.accountID)
 			request, err := http.NewRequest(http.MethodGet, url, nil)
 			require.NoError(t, err)
+
+			tc.addAuth(request, server.tokenMaker)
 			server.router.ServeHTTP(recorder, request)
 			//check response
 			tc.checkResponse(t, recorder)
@@ -106,7 +156,8 @@ func TestGetAccount(t *testing.T) {
 }
 
 func TestCreateAccount(t *testing.T) {
-	account := randomAccount()
+	user, _ := randomUser(t)
+	account := randomAccount(user.Username)
 
 	testCases := []struct {
 		name          string
@@ -204,9 +255,9 @@ func TestCreateAccount(t *testing.T) {
 func TestListAccount(t *testing.T) {
 	n := 5
 	accounts := make([]db.Account, n)
-
+	user, _ := randomUser(t)
 	for i := 0; i < n; i++ {
-		accounts[i] = randomAccount()
+		accounts[i] = randomAccount(user.Username)
 	}
 
 	type Query struct {
@@ -304,10 +355,10 @@ func TestListAccount(t *testing.T) {
 
 }
 
-func randomAccount() db.Account {
+func randomAccount(username string) db.Account {
 	return db.Account{
 		ID:       util.RandomInt(1, 100),
-		Owner:    util.RandomOwnerName(),
+		Owner:    username,
 		Balance:  util.RandomBalance(),
 		Currency: util.RandomCurrency(),
 	}
