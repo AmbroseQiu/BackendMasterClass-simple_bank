@@ -52,7 +52,7 @@ func TestGetAccount(t *testing.T) {
 			name:      "unauthorization",
 			accountID: account.ID,
 			addAuth: func(request *http.Request, tokenMaker token.Maker) {
-				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, "unthorizate user", time.Minute)
+				addAuthorization(t, request, tokenMaker, authorizationTypeBearer, "unthorizated user", time.Minute)
 			},
 			buildstub: func(store *mockdb.MockStore) {
 				store.EXPECT().
@@ -162,6 +162,7 @@ func TestCreateAccount(t *testing.T) {
 	testCases := []struct {
 		name          string
 		body          gin.H
+		addAuth       func(request *http.Request, tokenMaker token.Maker)
 		buildStub     func(store *mockdb.MockStore)
 		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
 	}{
@@ -170,6 +171,9 @@ func TestCreateAccount(t *testing.T) {
 			body: gin.H{
 				"owner":    account.Owner,
 				"currency": account.Currency,
+			},
+			addAuth: func(request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, "bearer", account.Owner, time.Minute)
 			},
 			buildStub: func(store *mockdb.MockStore) {
 				arg := db.CreateAccountParams{
@@ -193,6 +197,9 @@ func TestCreateAccount(t *testing.T) {
 				"owner":    123,
 				"currency": "NIL",
 			},
+			addAuth: func(request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, "bearer", account.Owner, time.Minute)
+			},
 			buildStub: func(store *mockdb.MockStore) {
 				store.EXPECT().
 					CreateAccount(gomock.Any(), gomock.Any()).
@@ -207,6 +214,9 @@ func TestCreateAccount(t *testing.T) {
 			body: gin.H{
 				"owner":    account.Owner,
 				"currency": account.Currency,
+			},
+			addAuth: func(request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, "bearer", account.Owner, time.Minute)
 			},
 			buildStub: func(store *mockdb.MockStore) {
 				arg := db.CreateAccountParams{
@@ -244,6 +254,7 @@ func TestCreateAccount(t *testing.T) {
 			url := "/accounts"
 			request, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(data))
 			require.NoError(t, err)
+			tc.addAuth(request, server.tokenMaker)
 			server.router.ServeHTTP(recorder, request)
 			//check response
 			tc.checkResponse(t, recorder)
@@ -268,6 +279,7 @@ func TestListAccount(t *testing.T) {
 	testCases := []struct {
 		name          string
 		query         Query
+		addAuth       func(request *http.Request, tokenMaker token.Maker)
 		buildStub     func(store *mockdb.MockStore)
 		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
 	}{
@@ -277,8 +289,12 @@ func TestListAccount(t *testing.T) {
 				pageID:   1,
 				pageSize: int64(n),
 			},
+			addAuth: func(request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, "bearer", user.Username, time.Minute)
+			},
 			buildStub: func(store *mockdb.MockStore) {
 				arg := db.ListAccountsParams{
+					Owner:  user.Username,
 					Limit:  int32(n),
 					Offset: 0,
 				}
@@ -298,6 +314,9 @@ func TestListAccount(t *testing.T) {
 				pageID:   1,
 				pageSize: int64(n),
 			},
+			addAuth: func(request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, "bearer", user.Username, time.Minute)
+			},
 			buildStub: func(store *mockdb.MockStore) {
 				store.EXPECT().
 					ListAccounts(gomock.Any(), gomock.Any()).
@@ -313,6 +332,9 @@ func TestListAccount(t *testing.T) {
 			query: Query{
 				pageID:   -1,
 				pageSize: int64(n),
+			},
+			addAuth: func(request *http.Request, tokenMaker token.Maker) {
+				addAuthorization(t, request, tokenMaker, "bearer", user.Username, time.Minute)
 			},
 			buildStub: func(store *mockdb.MockStore) {
 				store.EXPECT().
@@ -347,6 +369,7 @@ func TestListAccount(t *testing.T) {
 			q.Add("page_id", fmt.Sprintf("%d", tc.query.pageID))
 			q.Add("page_size", fmt.Sprintf("%d", tc.query.pageSize))
 			request.URL.RawQuery = q.Encode()
+			tc.addAuth(request, server.tokenMaker)
 			server.router.ServeHTTP(recorder, request)
 			//check response
 			tc.checkResponse(t, recorder)

@@ -35,7 +35,7 @@ func (server *Server) createTransfer(ctx *gin.Context) {
 		ctx.JSON(http.StatusUnauthorized, errResponse(err))
 	}
 
-	_, valid = server.validateAccount(ctx, req.FromAccountID, req.Currency)
+	_, valid = server.validateAccount(ctx, req.ToAccountID, req.Currency)
 
 	if !valid {
 		return
