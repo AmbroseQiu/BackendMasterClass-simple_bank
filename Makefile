@@ -8,16 +8,16 @@ dropdb:
 	docker exec -it postgres12 dropdb simple_bank
 
 migrateup:
-	migrate -path db/migration -database "postgresql://root:PAxG9FR0e58AJSFJpmgr@simplebank.cwsfirei38lc.ap-northeast-1.rds.amazonaws.com:5432/simple_bank" -verbose up
+	migrate -path db/migration -database "postgresql://root:secret@localhost:5432/simple_bank?sslmode=disable" -verbose up
 
 migratedown:
-	migrate -path db/migration -database "postgresql://root:PAxG9FR0e58AJSFJpmgr@simplebank.cwsfirei38lc.ap-northeast-1.rds.amazonaws.com:5432/simple_bank" -verbose down
+	migrate -path db/migration -database "postgresql://root:secret@localhost:5432/simple_bank?sslmode=disable" -verbose down
 
 migrateup1:
-	migrate -path db/migration -database "postgresql://root:PAxG9FR0e58AJSFJpmgr@simplebank.cwsfirei38lc.ap-northeast-1.rds.amazonaws.com:5432/simple_bank" -verbose up 1
+	migrate -path db/migration -database "postgresql://root:secret@localhost:5432/simple_bank?sslmode=disable" -verbose up 1
 
 migratedown1:
-	migrate -path db/migration -database "postgresql://root:PAxG9FR0e58AJSFJpmgr@simplebank.cwsfirei38lc.ap-northeast-1.rds.amazonaws.com:5432/simple_bank" -verbose down 1
+	migrate -path db/migration -database "postgresql://root:secret@localhost:5432/simple_bank?sslmode=disable" -verbose down 1
 
 server:
 	go run main.go
