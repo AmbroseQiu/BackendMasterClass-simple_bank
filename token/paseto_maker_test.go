@@ -33,7 +33,7 @@ func TestPasetoMaker(t *testing.T) {
 }
 
 func TestExpiredPasetoToken(t *testing.T) {
-	maker, err := NewJWTMaker(util.RandomString(32))
+	maker, err := NewPasetoMaker(util.RandomString(32))
 	require.NoError(t, err)
 
 	token, payload, err := maker.CreateToken(util.RandomOwnerName(), -time.Minute)
