@@ -5,7 +5,7 @@ CREATE TABLE "sessions" (
     "user_agent" varchar NOT NULL,
     "client_ip" varchar UNIQUE NOT NULL,
     "is_blocked" boolean NOT NULL DEFAULT false,
-    "expired_at" timestamptz NOT NULL,
+    "expires_at" timestamptz NOT NULL,
     "created_at" timestamptz NOT NULL DEFAULT (now())
 );
 

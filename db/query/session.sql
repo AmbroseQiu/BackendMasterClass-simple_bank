@@ -6,7 +6,7 @@ INSERT INTO sessions (
     user_agent,
     client_ip,
     is_blocked,
-    expired_at
+    expires_at
 ) VALUES (
   $1, $2, $3, $4, $5, $6, $7 
 ) RETURNING *;
