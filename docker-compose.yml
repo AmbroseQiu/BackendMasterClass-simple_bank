@@ -8,6 +8,8 @@ services:
       - POSTGRES_DB=simple_bank
     ports:
       - "5432:5432"
+    networks:
+      - bank-network
   api:
     build:
       context: .
@@ -26,3 +28,8 @@ services:
         "/app/start.sh"
       ]
     command: [ "/app/main" ]
+    networks:
+      - bank-network
+networks:
+  bank-network:
+    name: bank-network
