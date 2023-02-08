@@ -59,10 +59,10 @@ func TestCreateUserAPI(t *testing.T) {
 		{
 			name: "ok",
 			body: gin.H{
-				"username": user.Username,
-				"password": password,
-				"fullname": user.FullName,
-				"email":    user.Email,
+				"username":  user.Username,
+				"password":  password,
+				"full_name": user.FullName,
+				"email":     user.Email,
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				arg := db.CreateUserParams{
@@ -84,10 +84,10 @@ func TestCreateUserAPI(t *testing.T) {
 		{
 			name: "Invalid Email",
 			body: gin.H{
-				"username": user.Username,
-				"password": password,
-				"fullname": user.FullName,
-				"email":    "abcemail.com",
+				"username":  user.Username,
+				"password":  password,
+				"full_name": user.FullName,
+				"email":     "abcemail.com",
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				//build stub
@@ -102,10 +102,10 @@ func TestCreateUserAPI(t *testing.T) {
 		{
 			name: "Invalid Password",
 			body: gin.H{
-				"username": user.Username,
-				"password": "12345",
-				"fullname": user.FullName,
-				"email":    user.Email,
+				"username":  user.Username,
+				"password":  "12345",
+				"full_name": user.FullName,
+				"email":     user.Email,
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				//build stub
@@ -120,10 +120,10 @@ func TestCreateUserAPI(t *testing.T) {
 		{
 			name: "Invalid Username",
 			body: gin.H{
-				"username": "abdc#",
-				"password": password,
-				"fullname": user.FullName,
-				"email":    user.Email,
+				"username":  "abdc#",
+				"password":  password,
+				"full_name": user.FullName,
+				"email":     user.Email,
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				//build stub
@@ -138,10 +138,10 @@ func TestCreateUserAPI(t *testing.T) {
 		{
 			name: "StatusInternalServerError",
 			body: gin.H{
-				"username": user.Username,
-				"password": password,
-				"fullname": user.FullName,
-				"email":    user.Email,
+				"username":  user.Username,
+				"password":  password,
+				"full_name": user.FullName,
+				"email":     user.Email,
 			},
 			buildStubs: func(store *mockdb.MockStore) {
 				arg := db.CreateUserParams{
