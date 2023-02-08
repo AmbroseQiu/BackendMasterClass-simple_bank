@@ -97,7 +97,7 @@ func (server *Server) loginUser(ctx *gin.Context) {
 	}
 
 	// check user is existed and check password
-	getUser, err := server.store.GetUser(ctx, req.Username)
+	user, err := server.store.GetUser(ctx, req.Username)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			ctx.JSON(http.StatusNotFound, errResponse(err))
@@ -105,18 +105,18 @@ func (server *Server) loginUser(ctx *gin.Context) {
 		}
 		ctx.JSON(http.StatusInternalServerError, errResponse(err))
 	}
-	err = util.CheckPassword(req.Password, getUser.HashedPassword)
+	err = util.CheckPassword(req.Password, user.HashedPassword)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, errResponse(err))
 		return
 	}
 	// return loginUserResponse
-	accessToken, accessPayload, err := server.tokenMaker.CreateToken(getUser.Username, server.config.AccessTokenDuration)
+	accessToken, accessPayload, err := server.tokenMaker.CreateToken(user.Username, server.config.AccessTokenDuration)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, errResponse(err))
 	}
 
-	refreshToken, refreshPayload, err := server.tokenMaker.CreateToken(getUser.Username, server.config.RefreshTokenDuration)
+	refreshToken, refreshPayload, err := server.tokenMaker.CreateToken(user.Username, server.config.RefreshTokenDuration)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, errResponse(err))
 	}
@@ -141,7 +141,7 @@ func (server *Server) loginUser(ctx *gin.Context) {
 		AccessTokenExpiresAt:  accessPayload.ExpiredAt,
 		RefreshToken:          refreshToken,
 		RefreshTokenExpiresAt: refreshPayload.ExpiredAt,
-		User:                  newUserResponse(getUser),
+		User:                  newUserResponse(user),
 	}
 
 	ctx.JSON(http.StatusOK, rsp)
