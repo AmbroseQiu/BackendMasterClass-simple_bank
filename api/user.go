@@ -15,7 +15,7 @@ import (
 type createUserRequest struct {
 	Username string `json:"username" binding:"required,alphanumunicode"`
 	Password string `json:"password" binding:"required,min=6"`
-	FullName string `json:"fullname" binding:"required"`
+	FullName string `json:"full_name" binding:"required"`
 	Email    string `json:"email" binding:"required,email"`
 }
 
@@ -32,7 +32,7 @@ func newUserResponse(user db.User) userResponse {
 		Username:          user.Username,
 		FullName:          user.FullName,
 		Email:             user.Email,
-		PasswordChangedAt: user.PasswordCreatedAt,
+		PasswordChangedAt: user.PasswordChangedAt,
 		CreatedAt:         user.CreatedAt,
 	}
 }
