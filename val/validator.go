@@ -14,7 +14,7 @@ var (
 func ValidateString(value string, minLength int, maxLength int) error {
 	n := len(value)
 	if n < minLength || n > maxLength {
-		return fmt.Errorf("must contain %v-%v characters ", minLength, maxLength)
+		return fmt.Errorf("value: %v must contain %v-%v characters ", value, minLength, maxLength)
 	}
 	return nil
 }
@@ -24,7 +24,7 @@ func ValidateUserName(name string) error {
 		return err
 	}
 	if !isValidateUsername(name) {
-		return fmt.Errorf("must contain only lowercase letters, digits, or underscore ")
+		return fmt.Errorf("value: %v, must contain only lowercase letters, digits, or underscore ", name)
 	}
 	return nil
 }
@@ -38,7 +38,7 @@ func ValidateEmail(email string) error {
 		return err
 	}
 	if _, err := mail.ParseAddress(email); err != nil {
-		return fmt.Errorf("is not valid email address")
+		return fmt.Errorf("value: %v is not valid email address", email)
 	}
 	return nil
 }
@@ -48,7 +48,7 @@ func ValidateFullName(name string) error {
 		return err
 	}
 	if !isValidateFullname(name) {
-		return fmt.Errorf("must contain only letters and space")
+		return fmt.Errorf("value: %v is not allowed, must contain only letters and space", name)
 	}
 	return nil
 }

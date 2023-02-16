@@ -15,10 +15,10 @@ import (
 )
 
 func (server *Server) LoginUser(ctx context.Context, req *pb.LoginUserRequest) (*pb.LoginUserResponse, error) {
-	violations := validateLoginUserRequest(req)
-	if violations != nil {
-		return nil, InvalidArgumentError(violations)
-	}
+	// violations := validateLoginUserRequest(req)
+	// if violations != nil {
+	// 	return nil, invalidArgumentError(violations)
+	// }
 	// check user is existed and check password
 	user, err := server.store.GetUser(ctx, req.GetUsername())
 	if err != nil {
