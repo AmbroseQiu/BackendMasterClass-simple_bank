@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"database/sql"
-	"log"
 	"net"
 	"net/http"
+	"os"
 
 	"github.com/backendmaster/simple_bank/api"
 	db "github.com/backendmaster/simple_bank/db/sqlc"
@@ -14,6 +14,8 @@ import (
 	"github.com/backendmaster/simple_bank/util"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	_ "github.com/lib/pq"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -22,12 +24,12 @@ import (
 func main() {
 	config, err := util.LoadConfig(".")
 	if err != nil {
-		log.Fatalf("Load Config Failed: %v", err)
+		log.Fatal().Err(err).Msg("Load Config Failed: ")
 	}
 
 	conn, err := sql.Open(config.DBDriver, config.DBSource)
 	if err != nil {
-		log.Fatalf("can't not connect to database %v", err)
+		log.Fatal().Err(err).Msg("can't not connect to database ")
 	}
 
 	store := db.NewStore(conn)
@@ -36,9 +38,10 @@ func main() {
 	// runGinServer(config, store)
 }
 func runGrpcServer(config util.Config, store db.Store) {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	server, err := gapi.NewServer(config, store)
 	if err != nil {
-		log.Fatalf("Can't not create gapi server %v", err)
+		log.Fatal().Err(err).Msg("Can't not create gapi server ")
 	}
 
 	grpcLogger := grpc.UnaryInterceptor(gapi.GrpcLogger)
@@ -48,20 +51,20 @@ func runGrpcServer(config util.Config, store db.Store) {
 
 	listener, err := net.Listen("tcp", config.GRPCServerAddress)
 	if err != nil {
-		log.Fatalf("can't not create listener %v", err)
+		log.Fatal().Err(err).Msg("can't not create listener ")
 	}
 
-	log.Printf("start grpc server at %v", listener.Addr().String())
+	log.Info().Msgf("start grpc server at %s", listener.Addr().String())
 	err = grpcServer.Serve(listener)
 	if err != nil {
-		log.Fatalf("can't not create grpc server %v", err)
+		log.Fatal().Err(err).Msg("can't not create grpc server ")
 	}
 
 }
 func runGateWayServer(config util.Config, store db.Store) {
 	server, err := gapi.NewServer(config, store)
 	if err != nil {
-		log.Fatalf("Can't not create gapi server %v", err)
+		log.Fatal().Err(err).Msg("Can't not create gapi server ")
 	}
 
 	jsonOption := runtime.WithMarshalerOption(runtime.MIMEWildcard, &runtime.JSONPb{
@@ -79,7 +82,7 @@ func runGateWayServer(config util.Config, store db.Store) {
 
 	err = pb.RegisterSimpleBankHandlerServer(contex, grpcMux, server)
 	if err != nil {
-		log.Fatalf("can not register handler server %v", err)
+		log.Fatal().Err(err).Msg("can not register handler server ")
 	}
 
 	mux := http.NewServeMux()
@@ -87,25 +90,26 @@ func runGateWayServer(config util.Config, store db.Store) {
 
 	listener, err := net.Listen("tcp", config.HTTPServerAddress)
 	if err != nil {
-		log.Fatalf("can't not create listener %v", err)
+		log.Fatal().Err(err).Msg("can't not create listener ")
 	}
 
-	log.Printf("start http gateway server at %v", listener.Addr().String())
-	err = http.Serve(listener, mux)
+	log.Info().Msgf("start http gateway server at %s", listener.Addr().String())
+	hander := gapi.HttpLogger(mux)
+	err = http.Serve(listener, hander)
 	if err != nil {
-		log.Fatalf("can't not create http gateway server %v", err)
+		log.Fatal().Err(err).Msg("can't not create http gateway server ")
 	}
 
 }
 func runGinServer(config util.Config, store db.Store) {
 	server, err := api.NewServer(config, store)
 	if err != nil {
-		log.Fatalf("Can't not create gin server %v", err)
+		log.Fatal().Err(err).Msg("Can't not create gin server ")
 	}
 
 	err = server.Start(config.HTTPServerAddress)
 
 	if err != nil {
-		log.Fatalf("can't not start server %v", err)
+		log.Fatal().Err(err).Msg("can't not start server ")
 	}
 }
