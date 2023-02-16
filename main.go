@@ -40,7 +40,9 @@ func runGrpcServer(config util.Config, store db.Store) {
 	if err != nil {
 		log.Fatalf("Can't not create gapi server %v", err)
 	}
-	grpcServer := grpc.NewServer()
+
+	grpcLogger := grpc.UnaryInterceptor(gapi.GrpcLogger)
+	grpcServer := grpc.NewServer(grpcLogger)
 	pb.RegisterSimpleBankServer(grpcServer, server)
 	reflection.Register(grpcServer)
 
