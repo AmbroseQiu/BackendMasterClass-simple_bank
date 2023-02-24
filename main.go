@@ -2,15 +2,19 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"net"
 	"net/http"
 	"os"
 
 	"github.com/backendmaster/simple_bank/api"
+	"github.com/backendmaster/simple_bank/db/gorm"
 	db "github.com/backendmaster/simple_bank/db/sqlc"
+	"github.com/backendmaster/simple_bank/delivery"
 	"github.com/backendmaster/simple_bank/gapi"
 	"github.com/backendmaster/simple_bank/pb"
+	repository "github.com/backendmaster/simple_bank/repository/postgresql"
+	"github.com/backendmaster/simple_bank/token"
+	"github.com/backendmaster/simple_bank/usercase"
 	"github.com/backendmaster/simple_bank/util"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	_ "github.com/lib/pq"
@@ -22,20 +26,37 @@ import (
 )
 
 func main() {
+
 	config, err := util.LoadConfig(".")
 	if err != nil {
 		log.Fatal().Err(err).Msg("Load Config Failed: ")
 	}
 
-	conn, err := sql.Open(config.DBDriver, config.DBSource)
-	if err != nil {
-		log.Fatal().Err(err).Msg("can't not connect to database ")
-	}
+	// conn, err := sql.Open(config.DBDriver, config.DBSource)
+	// if err != nil {
+	// 	log.Fatal().Err(err).Msg("can't not connect to database ")
+	// }
 
-	store := db.NewStore(conn)
-	go runGateWayServer(config, store)
-	runGrpcServer(config, store)
+	// store := db.NewStore(conn)
+
+	runCleanHttpServer(config)
+	// go runGateWayServer(config, store)
+	// runGrpcServer(config, store)
 	// runGinServer(config, store)
+}
+
+func runCleanHttpServer(config util.Config) {
+	dbClinet := gorm.DBClient{}
+	dbClinet.Connect(config)
+	userRepo := repository.NewpostgresqlUserRepository(dbClinet.Client)
+	tokenMaker, err := token.NewPasetoMaker(config.TokenSymmetricKey)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Can't not create token ")
+	}
+	usersTableUseCase := usercase.NewusersTableUserCase(config, userRepo, tokenMaker)
+	handler := delivery.NewUsersHandlerDelivery(usersTableUseCase)
+	handler.SetupRouter()
+	handler.Start(config.HTTPServerAddress)
 }
 func runGrpcServer(config util.Config, store db.Store) {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
@@ -111,5 +132,18 @@ func runGinServer(config util.Config, store db.Store) {
 
 	if err != nil {
 		log.Fatal().Err(err).Msg("can't not start server ")
+	}
+}
+
+func runGormServer(config util.Config, client gorm.DBClient) {
+	server, err := gorm.NewHttpServer(config, client.Client)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Can't not create gorm server ")
+	}
+
+	err = server.Start(config.HTTPServerAddress)
+
+	if err != nil {
+		log.Fatal().Err(err).Msg("can't not start gorm server ")
 	}
 }
