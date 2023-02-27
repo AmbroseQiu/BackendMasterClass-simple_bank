@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"net"
 	"net/http"
 	"os"
@@ -12,9 +13,6 @@ import (
 	"github.com/backendmaster/simple_bank/delivery"
 	"github.com/backendmaster/simple_bank/gapi"
 	"github.com/backendmaster/simple_bank/pb"
-	repository "github.com/backendmaster/simple_bank/repository/postgresql"
-	"github.com/backendmaster/simple_bank/token"
-	"github.com/backendmaster/simple_bank/usercase"
 	"github.com/backendmaster/simple_bank/util"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	_ "github.com/lib/pq"
@@ -32,31 +30,79 @@ func main() {
 		log.Fatal().Err(err).Msg("Load Config Failed: ")
 	}
 
-	// conn, err := sql.Open(config.DBDriver, config.DBSource)
-	// if err != nil {
-	// 	log.Fatal().Err(err).Msg("can't not connect to database ")
-	// }
+	conn, err := sql.Open(config.DBDriver, config.DBSource)
+	if err != nil {
+		log.Fatal().Err(err).Msg("can't not connect to database ")
+	}
 
 	// store := db.NewStore(conn)
 
-	runCleanHttpServer(config)
+	runGormHttpServer(config, conn)
 	// go runGateWayServer(config, store)
 	// runGrpcServer(config, store)
 	// runGinServer(config, store)
 }
 
-func runCleanHttpServer(config util.Config) {
-	dbClinet := gorm.DBClient{}
-	dbClinet.Connect(config)
-	userRepo := repository.NewpostgresqlUserRepository(dbClinet.Client)
-	tokenMaker, err := token.NewPasetoMaker(config.TokenSymmetricKey)
+// type User struct {
+// 	Name  string `json:"name"`
+// 	Email string `json:"email"`
+// }
+
+// type Response struct {
+// 	User
+// 	UserAgent string
+// 	ClientIP  string
+// }
+
+// func main() {
+// 	http.HandleFunc("/", handler)
+// 	http.ListenAndServe(":8080", nil)
+// }
+
+// func handler(w http.ResponseWriter, r *http.Request) {
+// 	// Read the request body
+// 	body, err := ioutil.ReadAll(r.Body)
+// 	if err != nil {
+// 		http.Error(w, "Unable to read request body", http.StatusBadRequest)
+// 		return
+// 	}
+
+// 	var user User
+
+// 	err = json.Unmarshal(body, &user)
+// 	if err != nil {
+// 		http.Error(w, "Bad Request", http.StatusBadRequest)
+// 		return
+// 	}
+
+// 	rsp := Response{
+// 		User:      user,
+// 		UserAgent: r.Header.Get("User-Agent"),
+// 		ClientIP:  r.Header.Get("X-Forwarded-For"),
+// 	}
+// 	if rsp.ClientIP == "" {
+// 		rsp.ClientIP = r.RemoteAddr
+// 	}
+// 	// Close the request body
+// 	defer r.Body.Close()
+
+// 	// Print the request body
+// 	// fmt.Fprintf(w, "Request body: %s", body)
+// 	// fmt.Fprintf(w, "Request user: %v", user)
+// 	json.NewEncoder(w).Encode(rsp)
+// }
+
+func runGormHttpServer(config util.Config, conn *sql.DB) {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	server, err := delivery.NewGormServer(config, conn)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Can't not create token ")
+		log.Fatal().Err(err).Msg("Can't not create gapi server ")
 	}
-	usersTableUseCase := usercase.NewusersTableUserCase(config, userRepo, tokenMaker)
-	handler := delivery.NewUsersHandlerDelivery(usersTableUseCase)
-	handler.SetupRouter()
-	handler.Start(config.HTTPServerAddress)
+	err = server.Start(config.HTTPServerAddress)
+
+	if err != nil {
+		log.Fatal().Err(err).Msg("can't not start server ")
+	}
 }
 func runGrpcServer(config util.Config, store db.Store) {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})

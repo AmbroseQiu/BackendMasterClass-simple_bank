@@ -23,6 +23,6 @@ type SessionRepository interface {
 }
 
 type SessionUseCase interface {
-	CreateSessionByUserName(ctx context.Context, username string) (Session, error)
-	// GetSessionByID(ctx)
+	CreateSession(ctx context.Context, session Session) (Session, error)
+	GetSessionByID(ctx context.Context, id uuid.UUID) (Session, error)
 }

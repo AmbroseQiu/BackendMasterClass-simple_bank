@@ -2,10 +2,21 @@ package domain
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/backendmaster/simple_bank/token"
 	"github.com/google/uuid"
+)
+
+var (
+	ErrorUserNotFound         = errors.New("User Not Found")
+	ErrorUserBadRequest       = errors.New("User Bad Request")
+	ErrorInternalServerError  = errors.New("User InternalServerError")
+	ErrorPermissionNowAllowed = errors.New("User Permission Not Allowed")
+	ErrorStatusForbidden      = errors.New("Status Forbidden")
+	ErrorUniqueViolation      = errors.New("Unique Violation")
+	ErrorStatusUnauthorized   = errors.New("Status Unauthorized")
 )
 
 type User struct {
@@ -50,15 +61,15 @@ type LoginUserResponse struct {
 }
 
 type UsersRepository interface {
-	GetByUsername(cxt context.Context, username string) (User, error)
-	Create(cxt context.Context, user User) (User, error)
-	Update(cxt context.Context, user User) (User, error)
+	GetByUsername(cxt context.Context, username string) (*User, error)
+	Create(cxt context.Context, user User) (*User, error)
+	Update(cxt context.Context, user User) (*User, error)
 	// PrintLog() string
 }
 
 type UsersTableUseCase interface {
-	CreateUser(cxt context.Context, req CreateUserRequest) (UserResponse, error)
+	CreateUser(cxt context.Context, req CreateUserRequest) (*UserResponse, error)
 	CreateToken(username string, duration time.Duration) (string, *token.Payload, error)
 	// PrintLog() string
-	LoginUser(cxt context.Context, req LoginUserRequest) (LoginUserResponse, error)
+	LoginUser(cxt context.Context, req LoginUserRequest) (*LoginUserResponse, error)
 }
